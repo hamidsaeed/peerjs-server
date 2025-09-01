@@ -1,34 +1,43 @@
 // server.js
 import express from "express";
-import { ExpressPeerServer } from "peer";
-import http from "http";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import cors from "cors";
 
 const app = express();
+const httpServer = createServer(app);
 
-// Enable CORS (important for cross-domain requests)
 app.use(cors());
 
-// Basic route for health check
+// Health check route
 app.get("/", (req, res) => {
-  res.send("PeerJS Signaling Server is running");
+  res.send("Socket.IO signaling server is running ✅");
 });
 
-// Create HTTP server
-const server = http.createServer(app);
-
-// Create PeerJS server
-const peerServer = ExpressPeerServer(server, {
-  debug: true,
-  path: "/",       // use root path
-  proxied: true,   // important when behind reverse proxy (Render, Nginx, etc.)
+// Attach Socket.IO
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // ⚠️ in production, replace with your Connect domain
+    methods: ["GET", "POST"]
+  }
 });
 
-// Attach PeerJS to /peerjs endpoint
-app.use("/peerjs", peerServer);
+// Handle socket connections
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
 
-// Use Render’s PORT (or default 3000 locally)
+  socket.on("message", (data) => {
+    console.log("Message received:", data);
+    socket.broadcast.emit("message", data);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
+});
+
+// Render provides PORT
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`PeerJS server running on port ${PORT}`);
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Socket.IO signaling server running on port ${PORT}`);
 });
